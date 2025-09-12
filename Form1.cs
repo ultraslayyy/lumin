@@ -30,9 +30,9 @@ public partial class Form1 : Form
         Load += async (s, e) =>
         {
             await webView.EnsureCoreWebView2Async();
-            webView.Source = new Uri("https://beatkhana.com");
+            webView.Source = new Uri("https://github.com/ultraslayyy/lumin/tree/dotnet");
 
-            webView.CoreWebView2.NavigationCompleted += (s, e) =>
+            webView.CoreWebView2.HistoryChanged += (s, e) =>
             {
                 addressBar.Text = webView.Source.ToString();
             };
