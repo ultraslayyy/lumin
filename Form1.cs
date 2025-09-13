@@ -114,7 +114,7 @@ public partial class Form1 : Form
     {
         Size dropdownSize = bookmarksDropdown.GetPreferredSize(new Size(0, 0));
         Point buttonBottomLeft = new Point(bookmarkBtn.Left, bookmarkBtn.Bottom);
-        Point screenPoint = bookmarkBtn.Parent.PointToScreen(buttonBottomLeft);
+        Point screenPoint = bookmarkBtn.Parent!.PointToScreen(buttonBottomLeft);
         Rectangle workingArea = Screen.FromControl(this).WorkingArea;
 
         if (screenPoint.X + dropdownSize.Width > workingArea.Right) screenPoint.X = workingArea.Right - dropdownSize.Width;
@@ -165,22 +165,22 @@ public static class BookmarkManager
 
     public static List<Bookmark> Load()
     {
-        if (!File.Exists(FilePath)) return new List<Bookmark>();
+        if (!File.Exists(FilePath)) return [];
         try
         {
             var json = File.ReadAllText(FilePath);
-            return JsonSerializer.Deserialize<List<Bookmark>>(json) ?? new List<Bookmark>();
+            return JsonSerializer.Deserialize<List<Bookmark>>(json) ?? [];
         }
         catch
         {
-            return new List<Bookmark>();
+            return [];
         }
     }
 
     public static void Save(List<Bookmark> bookmarks)
     {
         string? folder = Path.GetDirectoryName(FilePath);
-        if (!Directory.Exists(folder)) Directory.CreateDirectory(folder);
+        if (!Directory.Exists(folder)) Directory.CreateDirectory(folder ?? "bookmarks.json");
 
         var json = JsonSerializer.Serialize(bookmarks, new JsonSerializerOptions { WriteIndented = true });
         File.WriteAllText(FilePath, json);

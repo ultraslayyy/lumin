@@ -19,13 +19,21 @@ static class Program
 
             try
             {
-                using WebClient client = new WebClient();
-                client.DownloadFile(boostrapperUrl, tempPath);
+                using (HttpClient client = new HttpClient())
+                {
+                    var data = client.GetByteArrayAsync(boostrapperUrl).GetAwaiter().GetResult();
+                    File.WriteAllBytes(tempPath, data);
+                }
 
-                var process = new Process();
-                process.StartInfo.FileName = tempPath;
-                process.StartInfo.Arguments = "/silent /install";
-                process.StartInfo.UseShellExecute = false;
+                var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = tempPath,
+                        Arguments = "/silent /install",
+                        UseShellExecute = false
+                    }
+                };
                 process.Start();
                 process.WaitForExit();
             }
