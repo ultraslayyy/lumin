@@ -7,8 +7,9 @@ public partial class Form1 : Form
 {
     readonly WebView2 webView;
     readonly TextBox addressBar;
-    readonly Button backBtn, forwardBtn, reloadBtn, bookmarkBtn, bookmarkDropdownBtn;
-    readonly ContextMenuStrip bookmarksDropdown;
+    readonly Button backBtn, forwardBtn, reloadBtn, bookmarkBtn, bookmarkDropdownBtn, historyDropdownBtn;
+    readonly ContextMenuStrip bookmarksDropdown, historyDropdown;
+    readonly List<string> history = [];
 
     public Form1()
     {
@@ -46,6 +47,12 @@ public partial class Form1 : Form
             Width = 30,
             Anchor = AnchorStyles.Top | AnchorStyles.Right
         };
+        historyDropdownBtn = new Button
+        {
+            Text = "⏰",
+            Width = 40,
+            Anchor = AnchorStyles.Top | AnchorStyles.Right
+        };
         addressBar = new TextBox
         {
             Width = 900,
@@ -57,10 +64,11 @@ public partial class Form1 : Form
         Controls.Add(reloadBtn);
         Controls.Add(bookmarkBtn);
         Controls.Add(bookmarkDropdownBtn);
+        Controls.Add(historyDropdownBtn);
         Controls.Add(addressBar);
 
         int toolbarTop = 5;
-        backBtn.Top = forwardBtn.Top = reloadBtn.Top = bookmarkBtn.Top = bookmarkDropdownBtn.Top = addressBar.Top = toolbarTop;
+        backBtn.Top = forwardBtn.Top = reloadBtn.Top = bookmarkBtn.Top = bookmarkDropdownBtn.Top = historyDropdownBtn.Top = addressBar.Top = toolbarTop;
 
         backBtn.Left = 10;
         forwardBtn.Left = backBtn.Right + 5;
@@ -68,8 +76,14 @@ public partial class Form1 : Form
         addressBar.Left = reloadBtn.Right + 5;
         bookmarkBtn.Left = addressBar.Right + 5;
         bookmarkDropdownBtn.Left = bookmarkBtn.Right + 2;
+        historyDropdownBtn.Left = bookmarkDropdownBtn.Right + 5;
 
         bookmarksDropdown = new ContextMenuStrip
+        {
+            ShowImageMargin = false,
+            RightToLeft = RightToLeft.No
+        };
+        historyDropdown = new ContextMenuStrip
         {
             ShowImageMargin = false,
             RightToLeft = RightToLeft.No
@@ -77,7 +91,11 @@ public partial class Form1 : Form
 
         bookmarkDropdownBtn.Click += (s, e) =>
         {
-            ShowBookmarksDropdown();
+            ShowDropdown(bookmarkBtn, bookmarksDropdown);
+        };
+        historyDropdownBtn.Click += (s, e) =>
+        {
+            ShowDropdown(historyDropdownBtn, historyDropdown);
         };
 
         webView = new WebView2
@@ -98,9 +116,41 @@ public partial class Form1 : Form
 
             webView.CoreWebView2.HistoryChanged += (s, e) =>
             {
-                addressBar.Text = webView.Source.ToString();
-                backBtn.Enabled = webView.CanGoBack;
-                forwardBtn.Enabled = webView.CanGoForward;
+                var currentUrl = webView.Source.ToString();
+                if (!string.IsNullOrWhiteSpace(currentUrl))
+                {
+                    addressBar.Text = currentUrl;
+                    backBtn.Enabled = webView.CanGoBack;
+                    forwardBtn.Enabled = webView.CanGoForward;
+
+                    if (history.Count == 0 || history[^1] != currentUrl)
+                    {
+                        history.Add(currentUrl);
+
+                        var item = new ToolStripMenuItem(currentUrl);
+                        item.Click += (_, _) => Navigate(currentUrl);
+                        historyDropdown.Items.Insert(0, item);
+
+                        const int MaxHistory = 100;
+                        if (history.Count > MaxHistory)
+                        {
+                            history.RemoveAt(0);
+                            historyDropdown.Items.RemoveAt(historyDropdown.Items.Count - 1);
+                        }
+                    }
+                }
+            };
+
+            webView.CoreWebView2.DocumentTitleChanged += (s, e) =>
+            {
+                if (history.Count > 0 && history[^1] == webView.Source.ToString())
+                {
+                    string newTitle = webView.CoreWebView2.DocumentTitle;
+                    if (!string.IsNullOrWhiteSpace(newTitle))
+                    {
+                        historyDropdown.Items[0].Text = newTitle;
+                    }
+                }
             };
 
             RefreshBookmarksDropdown();
@@ -130,23 +180,22 @@ public partial class Form1 : Form
             BookmarkManager.Save(bookmarks);
             MessageBox.Show("Bookmark saved!", "Bookmarks", MessageBoxButtons.OK, MessageBoxIcon.Information);
             RefreshBookmarksDropdown();
-            ShowBookmarksDropdown();
+            ShowDropdown(bookmarkBtn, bookmarksDropdown);
         };
     }
 
-    private void ShowBookmarksDropdown()
+    private void ShowDropdown(Control btn, ContextMenuStrip menu)
     {
-        Size dropdownSize = bookmarksDropdown.GetPreferredSize(new Size(0, 0));
-        Point buttonBottomLeft = new(bookmarkBtn.Left, bookmarkBtn.Bottom);
-        Point screenPoint = bookmarkBtn.Parent!.PointToScreen(buttonBottomLeft);
+        Size dropdownSize = menu.GetPreferredSize(new Size(0, 0));
+        Point buttonBottomLeft = new(btn.Left, btn.Bottom);
+        Point screenPoint = btn.Parent!.PointToScreen(buttonBottomLeft);
         Rectangle workingArea = Screen.FromControl(this).WorkingArea;
 
         if (screenPoint.X + dropdownSize.Width > workingArea.Right) screenPoint.X = workingArea.Right - dropdownSize.Width;
-        if (screenPoint.Y + dropdownSize.Height > workingArea.Bottom) screenPoint.Y = screenPoint.Y - dropdownSize.Height - bookmarkBtn.Height;
+        if (screenPoint.Y + dropdownSize.Height > workingArea.Bottom) screenPoint.Y = screenPoint.Y - dropdownSize.Height - btn.Height;
 
-        bookmarksDropdown.Show(screenPoint);
+        menu.Show(screenPoint);
     }
-
 
     private void Navigate(string url)
     {
