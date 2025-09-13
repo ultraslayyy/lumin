@@ -16,12 +16,41 @@ public partial class Form1 : Form
         Text = "Lumin";
         Width = 1200; Height = 800;
 
-        backBtn = new Button { Text = "←", Width = 30 };
-        forwardBtn = new Button { Text = "→", Width = 30 };
-        reloadBtn = new Button { Text = "⟳", Width = 30 };
-        bookmarkBtn = new Button { Text = "★", Width = 40 };
-        bookmarkDropdownBtn = new Button { Text = "▼", Width = 30 };
-        addressBar = new TextBox { Width = 900 };
+        backBtn = new Button
+        {
+            Text = "←",
+            Width = 30,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left
+        };
+        forwardBtn = new Button
+        {
+            Text = "→",
+            Width = 30,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left
+        };
+        reloadBtn = new Button
+        {
+            Text = "⟳",
+            Width = 30,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left
+        };
+        bookmarkBtn = new Button
+        {
+            Text = "★",
+            Width = 40,
+            Anchor = AnchorStyles.Top | AnchorStyles.Right
+        };
+        bookmarkDropdownBtn = new Button
+        {
+            Text = "▼",
+            Width = 30,
+            Anchor = AnchorStyles.Top | AnchorStyles.Right
+        };
+        addressBar = new TextBox
+        {
+            Width = 900,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+        };
 
         Controls.Add(backBtn);
         Controls.Add(forwardBtn);
@@ -40,16 +69,11 @@ public partial class Form1 : Form
         bookmarkBtn.Left = addressBar.Right + 5;
         bookmarkDropdownBtn.Left = bookmarkBtn.Right + 2;
 
-        addressBar.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-        backBtn.Anchor = AnchorStyles.Top | AnchorStyles.Left;
-        forwardBtn.Anchor = AnchorStyles.Top | AnchorStyles.Left;
-        reloadBtn.Anchor = AnchorStyles.Top | AnchorStyles.Left;
-        bookmarkBtn.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-        bookmarkDropdownBtn.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-
-        bookmarksDropdown = new ContextMenuStrip();
-        bookmarksDropdown.ShowImageMargin = false;
-        bookmarksDropdown.RightToLeft = RightToLeft.No;
+        bookmarksDropdown = new ContextMenuStrip
+        {
+            ShowImageMargin = false,
+            RightToLeft = RightToLeft.No
+        };
 
         bookmarkDropdownBtn.Click += (s, e) =>
         {
@@ -113,7 +137,7 @@ public partial class Form1 : Form
     private void ShowBookmarksDropdown()
     {
         Size dropdownSize = bookmarksDropdown.GetPreferredSize(new Size(0, 0));
-        Point buttonBottomLeft = new Point(bookmarkBtn.Left, bookmarkBtn.Bottom);
+        Point buttonBottomLeft = new(bookmarkBtn.Left, bookmarkBtn.Bottom);
         Point screenPoint = bookmarkBtn.Parent!.PointToScreen(buttonBottomLeft);
         Rectangle workingArea = Screen.FromControl(this).WorkingArea;
 
@@ -177,12 +201,17 @@ public static class BookmarkManager
         }
     }
 
+    private static readonly JsonSerializerOptions s_writeOptions = new()
+    {
+        WriteIndented = true
+    };
+
     public static void Save(List<Bookmark> bookmarks)
     {
         string? folder = Path.GetDirectoryName(FilePath);
         if (!Directory.Exists(folder)) Directory.CreateDirectory(folder ?? "bookmarks.json");
 
-        var json = JsonSerializer.Serialize(bookmarks, new JsonSerializerOptions { WriteIndented = true });
+        var json = JsonSerializer.Serialize(bookmarks, s_writeOptions);
         File.WriteAllText(FilePath, json);
     }
 }

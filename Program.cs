@@ -19,7 +19,7 @@ static class Program
 
             try
             {
-                using (HttpClient client = new HttpClient())
+                using (HttpClient client = new())
                 {
                     var data = client.GetByteArrayAsync(boostrapperUrl).GetAwaiter().GetResult();
                     File.WriteAllBytes(tempPath, data);
