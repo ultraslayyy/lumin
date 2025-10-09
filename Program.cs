@@ -1,6 +1,7 @@
-using System.Net;
 using System.Diagnostics;
 using Microsoft.Web.WebView2.Core;
+using System.Reflection;
+using System.Text.Json;
 
 namespace _;
 
@@ -44,9 +45,45 @@ static class Program
             }
         }
 
+        CheckForUpdatesAsync().GetAwaiter().GetResult();
+
         // To customize application configuration such as set high DPI settings or default font,
         // see https://aka.ms/applicationconfiguration.
         ApplicationConfiguration.Initialize();
         Application.Run(new Form1());
     }
+
+    private static async Task CheckForUpdatesAsync()
+    {
+        string currentVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";
+
+        using var client = new HttpClient();
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("LuminBrowser");
+
+        try
+        {
+            var json = await client.GetStringAsync("https://api.github.com/repos/ultraslayyy/Lumin/releases/latest");
+            var release = JsonSerializer.Deserialize<GitHubRelease>(json);
+
+            if (release != null && release.Tag_name.TrimStart('v') != currentVersion)
+            {
+                var result = MessageBox.Show($"A new version ({release.Tag_name}) is available. Download now?", "Update Available", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+
+                if (result == DialogResult.Yes)
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = release.Html_url,
+                        UseShellExecute = true
+                    });
+                }
+            }
+        }
+        catch
+        {
+
+        }
+    }
+
+    private record GitHubRelease(string Tag_name, string Html_url);
 }

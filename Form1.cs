@@ -1,5 +1,7 @@
 using System.Text.Json;
 using Microsoft.Web.WebView2.WinForms;
+using Microsoft.Web.WebView2.Core;
+using System.ComponentModel.DataAnnotations;
 
 namespace _;
 
@@ -112,6 +114,8 @@ public partial class Form1 : Form
         Load += async (s, e) =>
         {
             await webView.EnsureCoreWebView2Async();
+            webView.CoreWebView2.WebMessageReceived += CoreWebView2_WebMessageReceived;
+
             webView.Source = new Uri("https://google.com");
 
             webView.CoreWebView2.HistoryChanged += (s, e) =>
@@ -184,6 +188,36 @@ public partial class Form1 : Form
         };
     }
 
+    private async void CoreWebView2_WebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
+    {
+        try
+        {
+            var msg = e.TryGetWebMessageAsString();
+            using var doc = JsonDocument.Parse(msg);
+            var root = doc.RootElement;
+            var action = root.GetProperty("action").GetString() ?? "";
+
+            switch (action)
+            {
+                case "getBookmarks":
+                    var bookmarks = BookmarkManager.Load();
+                    webView.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(bookmarks));
+                    break;
+                case "open":
+                    if (root.TryGetProperty("url", out var urlEl))
+                        Navigate(urlEl.GetString() ?? "");
+                    break;
+                case "getHistory":
+                    webView.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(history));
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            webView.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(new { error = ex.Message }));
+        }
+    }
+
     private void ShowDropdown(Control btn, ContextMenuStrip menu)
     {
         Size dropdownSize = menu.GetPreferredSize(new Size(0, 0));
@@ -199,7 +233,47 @@ public partial class Form1 : Form
 
     private void Navigate(string url)
     {
-        if (!url.StartsWith("http://") && !url.StartsWith("https://")) url = "https://" + url;
+        if (url.StartsWith("lumin://", StringComparison.OrdinalIgnoreCase))
+        {
+            NavigateInternal(url);
+            return;
+        }
+
+        if (url.StartsWith("file:///", StringComparison.OrdinalIgnoreCase))
+        {
+            NavigateFile(url);
+            return;
+        }
+
+        if (File.Exists(url))
+        {
+            string fileUrl = new Uri(url).AbsoluteUri;
+            NavigateFile(fileUrl);
+            return;
+        }
+
+        if (url.StartsWith("about:", StringComparison.OrdinalIgnoreCase) ||
+            url.StartsWith("blob:", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                webView.Source = new Uri(url);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Invalid URL format: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+        }
+
+        if (url.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+        {
+            HandleDataUrl(url);
+            return;
+        }
+
+        if (!url.Contains("://"))
+            url = "https://" + url;
         try
         {
             webView.Source = new Uri(url);
@@ -222,6 +296,109 @@ public partial class Form1 : Form
             };
             item.Click += (s, e) => webView.Source = new Uri(bm.Url);
             bookmarksDropdown.Items.Add(item);
+        }
+    }
+
+    private void NavigateInternal(string url)
+    {
+        string page = url.Replace("lumin://", "").ToLowerInvariant();
+
+        switch (page)
+        {
+            case "settings":
+                ShowInternalPage("Settings");
+                break;
+            case "bookmarks":
+                ShowInternalPage("Bookmarks");
+                break;
+            default:
+                ShowInternalPage($"lumin://{page}", "404 - Page Not Found");
+                break;
+        }
+    }
+
+    private void ShowInternalPage(string title, string fallback = "")
+    {
+        string html = File.ReadAllText($"internal/{title}.html");
+        webView.NavigateToString(html);
+        addressBar.Text = $"lumin://{title.ToLower()}";
+    }
+
+    private void NavigateFile(string fileUrl)
+    {
+        try
+        {
+            Uri uri = new(fileUrl);
+            if (!File.Exists(uri.LocalPath))
+            {
+                MessageBox.Show("File not found: " + uri.LocalPath, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            webView.Source = uri;
+            addressBar.Text = fileUrl;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("Failed to open file:\n" + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void HandleDataUrl(string url)
+    {
+        try
+        {
+            int commaIndex = url.IndexOf(',');
+            if (commaIndex == -1)
+            {
+                MessageBox.Show("Invalid data URL format", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            string header = url[5..commaIndex];
+            string dataPart = url[(commaIndex + 1)..];
+
+            bool isBase64 = header.Contains(";base64", StringComparison.OrdinalIgnoreCase);
+            string mimeType = "text/plain";
+
+            if (!string.IsNullOrWhiteSpace(header))
+            {
+                string[] parts = header.Split(';', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length > 0 && parts[0].Contains('/'))
+                    mimeType = parts[0];
+            }
+
+            string content;
+            if (isBase64)
+            {
+                byte[] bytes = Convert.FromBase64String(dataPart);
+                content = System.Text.Encoding.UTF8.GetString(bytes);
+            }
+            else
+            {
+                content = Uri.UnescapeDataString(dataPart);
+            }
+
+            if (mimeType.Equals("text/html", StringComparison.OrdinalIgnoreCase))
+            {
+                webView.NavigateToString(content);
+            }
+            else if (mimeType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+            {
+                string html = $"<html><body style='margin:0'><img src='{url}' /></body></html>";
+                webView.NavigateToString(html);
+            }
+            else
+            {
+                string html = $"<pre style='white-space: pre-wrap; font-family: monospace'>{System.Web.HttpUtility.HtmlEncode(content)}</pre>";
+                webView.NavigateToString(html);
+            }
+
+            addressBar.Text = url;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Failed to handle data URL:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 }

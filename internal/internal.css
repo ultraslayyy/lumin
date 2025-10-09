@@ -1,0 +1,45 @@
+:root {
+  --bg: #fafafa;
+  --card: #fff;
+  --text: #222;
+  --accent: #0078d7;
+}
+
+body {
+  font-family: "Segoe UI", Roboto, system-ui, sans-serif;
+  background: var(--bg);
+  margin: 0;
+  color: var(--text);
+}
+
+.container {
+  padding: 24px;
+  max-width: 980px;
+  margin: auto;
+}
+
+h1 {
+  font-size: 1.6rem;
+  margin: 0 0 16px;
+}
+
+.card {
+  background: var(--card);
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06);
+  margin-bottom: 12px;
+}
+
+.bm {
+  padding: 6px 0;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}

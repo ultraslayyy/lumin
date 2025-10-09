@@ -1,0 +1,20 @@
+<html lang="en">
+
+<head>
+  <title>Bookmarks</title>
+  <link rel="stylesheet" href="internal.css">
+</head>
+
+<body>
+  <pre id="out"></pre>
+  <script>
+    window.chrome.webview.addEventListener('message', e => {
+      const data = e.data;
+      document.getElementById('out').innerText = JSON.stringify(data, null, 2);
+    });
+
+    window.chrome.webview.postMessage(JSON.stringify({ action: 'getBookmarks' }));
+  </script>
+</body>
+
+</html>
